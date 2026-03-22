@@ -14,7 +14,9 @@
 // ============================================================
 
 const SITE_ID       = "SITE_ID";
-const METER_APPART  = "METER_APPART"; // compteur appart
+const METER_APPART  = "METER_APPART";   // compteur appart
+const METER_SOLAR   = "METER_SOLAR";   // production PV
+const DAILY_KWH     = 4.0; // Estimated daily average
 
 // Retry
 const MAX_RETRIES     = 3;
