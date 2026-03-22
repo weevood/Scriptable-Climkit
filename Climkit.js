@@ -15,12 +15,11 @@
 
 const SITE_ID       = "SITE_ID";
 const METER_APPART  = "METER_APPART"; // compteur appart
-const METER_SOLAR   = "METER_SOLAR"; // production PV
-const API_BASE      = "https://api.climkit.io/api/v1";
 
 // Retry
-const MAX_RETRIES   = 3;
-const RETRY_DELAY_MS = 2000; // attente entre chaque tentative
+const MAX_RETRIES     = 3;
+const RETRY_DELAY_MS  = 2000; // attente entre chaque tentative
+const API_BASE        = "https://api.climkit.io/api/v1";
 
 // Keychain keys (ne pas modifier)
 const KC_USER  = "climkit_username";
@@ -54,10 +53,14 @@ async function run() {
 
   // Requêtes séquentielles avec retry (évite les timeouts en parallèle)
   log("📡 Requête meter appart…");
-  const appart = await fetchWithRetry(token, METER_APPART, tStart, tEnd, "appart");
+  // const appart = await fetchWithRetry(token, METER_APPART, tStart, null, "appart");
+  const appart = [{"ext":0.028,"timestamp":"2026-03-22 05:30:00+01:00","self":0.001,"total":0.029},{"ext":0.02,"timestamp":"2026-03-22 05:45:00+01:00","self":0,"total":0.02},{"ext":0.022,"timestamp":"2026-03-22 06:00:00+01:00","self":0,"total":0.022},{"ext":0.028,"timestamp":"2026-03-22 06:15:00+01:00","self":0,"total":0.028},{"ext":0.029,"timestamp":"2026-03-22 06:30:00+01:00","self":0,"total":0.029},{"ext":0.027,"timestamp":"2026-03-22 06:45:00+01:00","self":0,"total":0.027},{"ext":0.022,"timestamp":"2026-03-22 07:00:00+01:00","self":0,"total":0.022},{"ext":0.037,"timestamp":"2026-03-22 07:15:00+01:00","self":0,"total":0.037},{"ext":0.054,"timestamp":"2026-03-22 07:30:00+01:00","self":0,"total":0.054},{"ext":0.065,"timestamp":"2026-03-22 07:45:00+01:00","self":0,"total":0.065},{"ext":0.045,"timestamp":"2026-03-22 08:00:00+01:00","self":0,"total":0.045}]
+  await sleep(1000);
 
   log("📡 Requête meter solaire…");
-  const solar  = await fetchWithRetry(token, METER_SOLAR,  tStart, tEnd, "solaire");
+  // const solar  = await fetchWithRetry(token, METER_SOLAR,  tStart, null, "solaire");
+  const solar = [{"total":0,"timestamp":"2026-03-22 05:30:00+01:00"},{"total":0,"timestamp":"2026-03-22 05:45:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:00:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:15:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:30:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:45:00+01:00"},{"total":0,"timestamp":"2026-03-22 07:00:00+01:00"},{"total":0,"timestamp":"2026-03-22 07:15:00+01:00"},{"total":0.004,"timestamp":"2026-03-22 07:30:00+01:00"},{"total":0.008,"timestamp":"2026-03-22 07:45:00+01:00"},{"total":0.024,"timestamp":"2026-03-22 08:00:00+01:00"}]
+  await sleep(1000);
 
   if (!appart) {
     log("❌ Données appart indisponibles après retries");
@@ -90,7 +93,7 @@ async function run() {
   log(`🧮 consoW=${consoW}W solarW=${solarW}W solarPct=${solarPct}%`);
 
   const ts = lastAppart?.timestamp
-    ? new Date(lastAppart.timestamp).toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit" })
+    ? new Date(lastAppart.timestamp).toLocaleTimeString("fr-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" })
     : "--:--";
 
   log(`✅ Rendu widget — ts=${ts}`);
@@ -116,8 +119,8 @@ async function fetchWithRetry(token, meterId, tStart, tEnd, label) {
     }
 
     if (attempt < MAX_RETRIES) {
-      log(`  [${label}] ⏳ Attente ${RETRY_DELAY_MS}ms avant retry…`);
-      await sleep(RETRY_DELAY_MS);
+      log(`  [${label}] ⏳ Attente ${RETRY_DELAY_MS * attempt}ms avant retry…`);
+      await sleep(RETRY_DELAY_MS * attempt);
     }
   }
   log(`  [${label}] 💀 Tous les retries épuisés`);
@@ -134,6 +137,8 @@ async function buildWidget({ consoW, solarW, solarPct, ts }) {
 
   const grad = new LinearGradient();
   if (solarPct >= 80) {
+    grad.colors = [new Color("#398233"), new Color("#22aa22")];
+  } else if (solarPct >= 60) {
     grad.colors = [new Color("#1a3a1a"), new Color("#0f2d0f")];
   } else if (solarPct >= 40) {
     grad.colors = [new Color("#2a3a10"), new Color("#1a2a08")];
@@ -144,20 +149,17 @@ async function buildWidget({ consoW, solarW, solarPct, ts }) {
   grad.startPoint = new Point(0, 0);
   grad.endPoint   = new Point(0, 1);
   w.backgroundGradient = grad;
-  w.setPadding(14, 16, 12, 16);
+  w.setPadding(32, 12, 24, 12);
 
   // ── Titre
   const titleRow = w.addStack();
   titleRow.layoutHorizontally();
   titleRow.centerAlignContent();
-  const titleIcon = titleRow.addText("⚡");
-  titleIcon.font = Font.systemFont(12);
-  titleRow.addSpacer(6);
-  const titleLabel = titleRow.addText("Énergie");
+  const titleLabel = titleRow.addText("⚡ Énergie");
   titleLabel.font = Font.boldSystemFont(12);
   titleLabel.textColor = Color.white();
   titleLabel.lineLimit = 1;
-
+  titleLabel.centerAlignText();
   w.addSpacer(8);
 
   // ── Metrics row
@@ -171,7 +173,6 @@ async function buildWidget({ consoW, solarW, solarPct, ts }) {
   sep.textColor = new Color("#ffffff30");
   metricsRow.addSpacer(null);
   addMetric(metricsRow, "🏠", "Conso", formatW(consoW), new Color("#7ec8e3"));
-
   w.addSpacer(8);
 
   // ── Pourcentage solaire
@@ -180,36 +181,18 @@ async function buildWidget({ consoW, solarW, solarPct, ts }) {
   pctStack.centerAlignContent();
   pctStack.addSpacer(null);
   const pctText = pctStack.addText(`${solarPct}%`);
-  pctText.font = Font.boldSystemFont(28);
+  pctText.font = Font.boldSystemFont(22);
   pctText.textColor = solarColor(solarPct);
   pctStack.addSpacer(null);
-
   const pctLabel = w.addText("d'énergie solaire");
   pctLabel.font = Font.systemFont(10);
   pctLabel.textColor = new Color("#ffffff80");
   pctLabel.centerAlignText();
-
-  w.addSpacer(8);
-
-  // ── Barre de progression
-  const barStack = w.addStack();
-  barStack.layoutHorizontally();
-  barStack.size = new Size(0, 8);
-  barStack.cornerRadius = 4;
-  barStack.backgroundColor = new Color("#ffffff20");
-  const filled = barStack.addStack();
-  filled.size = new Size(0, 8);
-  filled.layoutHorizontally();
-  filled.backgroundColor = new Color("#f5c518");
-  filled.cornerRadius = 4;
-  filled.addSpacer(null);
-  barStack.addSpacer(null);
-
   w.addSpacer(8);
 
   // ── Footer
   const footer = w.addText(`Dernière mesure : ${ts}`);
-  footer.font = Font.systemFont(9);
+  footer.font = Font.systemFont(8);
   footer.textColor = new Color("#ffffff50");
   footer.centerAlignText();
 
@@ -235,8 +218,8 @@ function addMetric(stack, icon, label, value, color) {
 
 function solarColor(pct) {
   if (pct >= 80) return new Color("#4caf50");
-  if (pct >= 50) return new Color("#f5c518");
-  if (pct >= 20) return new Color("#ff9800");
+  if (pct >= 60) return new Color("#f5c518");
+  if (pct >= 40) return new Color("#ff9800");
   return new Color("#f44336");
 }
 
@@ -321,7 +304,7 @@ async function getValidToken() {
     Keychain.set(KC_TOKEN, resp.access_token);
     const exp = resp.valid_until?.$date ?? (Date.now() + 14 * 60 * 1000);
     Keychain.set(KC_EXP, String(exp));
-    log(`🔑 Token valide jusqu'à : ${new Date(exp).toLocaleTimeString()}`);
+    log(`🔑 Token valide jusqu'à : ${new Date(exp).toLocaleTimeString("fr-CH", { timeZone: "Europe/Zurich" })}`);
     return resp.access_token;
   } catch (e) {
     log(`❌ Exception auth : ${e}`);
@@ -373,6 +356,6 @@ function sleep(ms) {
 }
 
 function log(msg) {
-  const time = new Date().toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const time = new Date().toLocaleTimeString("fr-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit", second: "2-digit" });
   console.log(`[${time}] ${msg}`);
 }
