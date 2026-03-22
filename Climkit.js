@@ -53,13 +53,13 @@ async function run() {
 
   // Requêtes séquentielles avec retry (évite les timeouts en parallèle)
   log("📡 Requête meter appart…");
-  // const appart = await fetchWithRetry(token, METER_APPART, tStart, null, "appart");
-  const appart = [{"ext":0.028,"timestamp":"2026-03-22 05:30:00+01:00","self":0.001,"total":0.029},{"ext":0.02,"timestamp":"2026-03-22 05:45:00+01:00","self":0,"total":0.02},{"ext":0.022,"timestamp":"2026-03-22 06:00:00+01:00","self":0,"total":0.022},{"ext":0.028,"timestamp":"2026-03-22 06:15:00+01:00","self":0,"total":0.028},{"ext":0.029,"timestamp":"2026-03-22 06:30:00+01:00","self":0,"total":0.029},{"ext":0.027,"timestamp":"2026-03-22 06:45:00+01:00","self":0,"total":0.027},{"ext":0.022,"timestamp":"2026-03-22 07:00:00+01:00","self":0,"total":0.022},{"ext":0.037,"timestamp":"2026-03-22 07:15:00+01:00","self":0,"total":0.037},{"ext":0.054,"timestamp":"2026-03-22 07:30:00+01:00","self":0,"total":0.054},{"ext":0.065,"timestamp":"2026-03-22 07:45:00+01:00","self":0,"total":0.065},{"ext":0.045,"timestamp":"2026-03-22 08:00:00+01:00","self":0,"total":0.045}]
+  const appart = await fetchWithRetry(token, METER_APPART, tStart, null, "appart");
+  // const appart = [{"ext":0.028,"timestamp":"2026-03-22 05:30:00+01:00","self":0.001,"total":0.029},{"ext":0.02,"timestamp":"2026-03-22 05:45:00+01:00","self":0,"total":0.02},{"ext":0.022,"timestamp":"2026-03-22 06:00:00+01:00","self":0,"total":0.022},{"ext":0.028,"timestamp":"2026-03-22 06:15:00+01:00","self":0,"total":0.028},{"ext":0.029,"timestamp":"2026-03-22 06:30:00+01:00","self":0,"total":0.029},{"ext":0.027,"timestamp":"2026-03-22 06:45:00+01:00","self":0,"total":0.027},{"ext":0.022,"timestamp":"2026-03-22 07:00:00+01:00","self":0,"total":0.022},{"ext":0.037,"timestamp":"2026-03-22 07:15:00+01:00","self":0,"total":0.037},{"ext":0.054,"timestamp":"2026-03-22 07:30:00+01:00","self":0,"total":0.054},{"ext":0.065,"timestamp":"2026-03-22 07:45:00+01:00","self":0,"total":0.065},{"ext":0.045,"timestamp":"2026-03-22 08:00:00+01:00","self":0,"total":0.045}]
   await sleep(1000);
 
   log("📡 Requête meter solaire…");
-  // const solar  = await fetchWithRetry(token, METER_SOLAR,  tStart, null, "solaire");
-  const solar = [{"total":0,"timestamp":"2026-03-22 05:30:00+01:00"},{"total":0,"timestamp":"2026-03-22 05:45:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:00:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:15:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:30:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:45:00+01:00"},{"total":0,"timestamp":"2026-03-22 07:00:00+01:00"},{"total":0,"timestamp":"2026-03-22 07:15:00+01:00"},{"total":0.004,"timestamp":"2026-03-22 07:30:00+01:00"},{"total":0.008,"timestamp":"2026-03-22 07:45:00+01:00"},{"total":0.024,"timestamp":"2026-03-22 08:00:00+01:00"}]
+  const solar  = await fetchWithRetry(token, METER_SOLAR,  tStart, null, "solaire");
+  // const solar = [{"total":0,"timestamp":"2026-03-22 05:30:00+01:00"},{"total":0,"timestamp":"2026-03-22 05:45:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:00:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:15:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:30:00+01:00"},{"total":0,"timestamp":"2026-03-22 06:45:00+01:00"},{"total":0,"timestamp":"2026-03-22 07:00:00+01:00"},{"total":0,"timestamp":"2026-03-22 07:15:00+01:00"},{"total":0.004,"timestamp":"2026-03-22 07:30:00+01:00"},{"total":0.008,"timestamp":"2026-03-22 07:45:00+01:00"},{"total":0.024,"timestamp":"2026-03-22 08:00:00+01:00"}]
   await sleep(1000);
 
   if (!appart) {
@@ -92,12 +92,18 @@ async function run() {
   log(`🧮 consoKwh=${consoKwh} solarKwh=${solarKwh} selfKwh=${selfKwh}`);
   log(`🧮 consoW=${consoW}W solarW=${solarW}W solarPct=${solarPct}%`);
 
+  // Somme de toutes les tranches du jour pour la progression journalière
+  const consoTodayKwh = Math.round(
+    appart.reduce((sum, d) => sum + (d.total ?? 0), 0) * 100
+  ) / 100;
+  log(`🧮 consoTodayKwh=${consoTodayKwh} kWh`);
+
   const ts = lastAppart?.timestamp
     ? new Date(lastAppart.timestamp).toLocaleTimeString("fr-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" })
     : "--:--";
 
   log(`✅ Rendu widget — ts=${ts}`);
-  await buildWidget({ consoW, solarW, solarPct, ts });
+  await buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh });
 }
 
 // ============================================================
@@ -131,7 +137,7 @@ async function fetchWithRetry(token, meterId, tStart, tEnd, label) {
 //  CONSTRUCTION DU WIDGET
 // ============================================================
 
-async function buildWidget({ consoW, solarW, solarPct, ts }) {
+async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh }) {
   const w = new ListWidget();
   w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
 
@@ -181,7 +187,7 @@ async function buildWidget({ consoW, solarW, solarPct, ts }) {
   pctStack.centerAlignContent();
   pctStack.addSpacer(null);
   const pctText = pctStack.addText(`${solarPct}%`);
-  pctText.font = Font.boldSystemFont(22);
+  pctText.font = Font.boldSystemFont(16);
   pctText.textColor = solarColor(solarPct);
   pctStack.addSpacer(null);
   const pctLabel = w.addText("d'énergie solaire");
@@ -189,10 +195,45 @@ async function buildWidget({ consoW, solarW, solarPct, ts }) {
   pctLabel.textColor = new Color("#ffffff80");
   pctLabel.centerAlignText();
   w.addSpacer(8);
+  
+// ── Barre de progression journalière
+  const progress  = Math.min(1, consoTodayKwh / DAILY_KWH);
+  const pctDay    = Math.round(progress * 100);
+  const barW = 120, barH = 6;
+  const dc   = new DrawContext();
+  dc.size    = new Size(barW, barH);
+  dc.opaque  = false;
+  const fillColor = progress >= 1    ? new Color("#f44336")
+                  : progress >= 0.75 ? new Color("#ff9800")
+                  :                    new Color("#4caf50");
+  const bgPath = new Path();
+  bgPath.addRoundedRect(new Rect(0, 0, barW, barH), barH / 2, barH / 2);
+  dc.addPath(bgPath);
+  dc.setFillColor(new Color("#ffffff80"));
+  dc.fillPath();
+  const fillW    = Math.max(barH, Math.round(barW * progress));
+  const fillPath = new Path();
+  fillPath.addRoundedRect(new Rect(0, 0, fillW, barH), barH / 2, barH / 2);
+  dc.addPath(fillPath);
+  dc.setFillColor(fillColor);
+  dc.fillPath();
+  const barRow = w.addStack();
+  barRow.layoutHorizontally();
+  barRow.addSpacer(null);
+  const barImg     = barRow.addImage(dc.getImage());
+  barImg.imageSize = new Size(barW, barH);
+  barRow.addSpacer(null);
+  w.addSpacer(3);
+  const barLabel = w.addText(`${consoTodayKwh.toFixed(2)}/${DAILY_KWH}kWh [${pctDay}%]`);
+  barLabel.font      = Font.systemFont(10);
+  barLabel.textColor = new Color("#ffffff80");
+  barLabel.centerAlignText();
+
+  w.addSpacer(8);
 
   // ── Footer
   const footer = w.addText(`Dernière mesure : ${ts}`);
-  footer.font = Font.systemFont(8);
+  footer.font = Font.systemFont(6);
   footer.textColor = new Color("#ffffff50");
   footer.centerAlignText();
 
