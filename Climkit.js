@@ -77,13 +77,33 @@ async function run() {
   }
 
   const lastAppart = appart[appart.length - 1];
-  const lastSolar  = solar[solar.length - 1];
+  const lastAppart = appart[appart.length - 2];
+  const lastSolar  = solar[solar.length - 2];
+  const prevAppart = appart[appart.length - 3];
+  const prevSolar  = solar[solar.length - 3];
+
   log(`📦 Dernière tranche appart : ${JSON.stringify(lastAppart)}`);
   log(`📦 Dernière tranche solaire : ${JSON.stringify(lastSolar)}`);
 
   const consoKwh = lastAppart?.total ?? 0;
   const solarKwh = lastSolar?.total  ?? 0;
   const selfKwh  = lastAppart?.self  ?? 0;
+
+  const prevConsoKwh = prevAppart?.total ?? 0;
+  const prevSolarKwh = prevSolar?.total  ?? 0;
+
+  // Tendance solaire : ↑ vert si production monte, ↓ rouge si baisse
+  const solarTrend = solarKwh > prevSolarKwh ? "up"
+                   : solarKwh < prevSolarKwh ? "down"
+                   : "flat";
+
+  // Tendance conso : ↑ rouge si on consomme plus, ↓ vert si on consomme moins
+  const consoTrend = consoKwh > prevConsoKwh ? "up"
+                   : consoKwh < prevConsoKwh ? "down"
+                   : "flat";
+
+  log(`🧮 solarTrend=${solarTrend} (prev=${prevSolarKwh} → cur=${solarKwh})`);
+  log(`🧮 consoTrend=${consoTrend} (prev=${prevConsoKwh} → cur=${consoKwh})`);
 
   const solarPct = consoKwh > 0
     ? Math.min(100, Math.round((selfKwh / consoKwh) * 100))
@@ -106,7 +126,7 @@ async function run() {
     : "--:--";
 
   log(`✅ Rendu widget — ts=${ts}`);
-  await buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh });
+  await buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend });
 }
 
 // ============================================================
@@ -137,10 +157,24 @@ async function fetchWithRetry(token, meterId, tStart, tEnd, label) {
 }
 
 // ============================================================
+//  UTILITAIRE TARIF
+// ============================================================
+
+function checkLowTariff() {
+  const now = new Date();
+  const hour = parseInt(
+    now.toLocaleString("fr-CH", { timeZone: "Europe/Zurich", hour: "numeric", hour12: false }),
+    10
+  );
+  // BT : 23h–7h et 12h–17h
+  return hour >= 23 || hour < 7 || (hour >= 12 && hour < 17);
+}
+
+// ============================================================
 //  CONSTRUCTION DU WIDGET
 // ============================================================
 
-async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh }) {
+async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend }) {
   const w = new ListWidget();
   w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
 
@@ -160,7 +194,7 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh }) {
   w.backgroundGradient = grad;
   w.setPadding(32, 12, 24, 12);
 
-  // ── Titre
+  // ── Titre + Tarif
   const titleRow = w.addStack();
   titleRow.layoutHorizontally();
   titleRow.centerAlignContent();
@@ -168,20 +202,34 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh }) {
   titleLabel.font = Font.boldSystemFont(12);
   titleLabel.textColor = Color.white();
   titleLabel.lineLimit = 1;
-  titleLabel.centerAlignText();
+  titleRow.addSpacer(null);
+  const isLowTariff = checkLowTariff();
+  // const tariffLabel = titleRow.addText(isLowTariff ? "🟢 BT" : "⭕ HT");
+  const tariffLabel = titleRow.addText(isLowTariff ? "🟢" : "⭕");
+  tariffLabel.font = Font.boldSystemFont(10);
+  tariffLabel.textColor = isLowTariff ? new Color("#4caf50") : new Color("#f44336");
   w.addSpacer(8);
 
   // ── Metrics row
   const metricsRow = w.addStack();
   metricsRow.layoutHorizontally();
   metricsRow.centerAlignContent();
-  addMetric(metricsRow, "☀️", "Solaire", formatW(solarW), new Color("#f5c518"));
+
+  // Solaire : ↑ vert (production monte = bien), ↓ rouge (production baisse = moins bien)
+  const solarTrendIcon  = solarTrend === "up" ? "↑ " : solarTrend === "down" ? "↓ " : "";
+  const solarTrendColor = solarTrend === "up" ? new Color("#4caf50") : new Color("#f44336");
+
+  // Conso : ↑ rouge (consomme plus = moins bien), ↓ vert (consomme moins = bien)
+  const consoTrendIcon  = consoTrend === "up" ? "↑ " : consoTrend === "down" ? "↓ " : "";
+  const consoTrendColor = consoTrend === "up" ? new Color("#f44336") : new Color("#4caf50");
+
+  addMetric(metricsRow, "☀️", "Solaire", solarTrendIcon, solarTrendColor, formatW(solarW), new Color("#f5c518"));
   metricsRow.addSpacer(null);
   const sep = metricsRow.addText("|");
   sep.font = Font.systemFont(20);
   sep.textColor = new Color("#ffffff30");
   metricsRow.addSpacer(null);
-  addMetric(metricsRow, "🏠", "Conso", formatW(consoW), new Color("#7ec8e3"));
+  addMetric(metricsRow, "🏠", "Conso", consoTrendIcon, consoTrendColor, formatW(consoW), new Color("#7ec8e3"));
   w.addSpacer(8);
 
   // ── Pourcentage solaire
@@ -190,7 +238,7 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh }) {
   pctStack.centerAlignContent();
   pctStack.addSpacer(null);
   const pctText = pctStack.addText(`${solarPct}%`);
-  pctText.font = Font.boldSystemFont(16);
+  pctText.font = Font.boldSystemFont(14);
   pctText.textColor = solarColor(solarPct);
   pctStack.addSpacer(null);
   const pctLabel = w.addText("d'énergie solaire");
@@ -198,8 +246,8 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh }) {
   pctLabel.textColor = new Color("#ffffff80");
   pctLabel.centerAlignText();
   w.addSpacer(8);
-  
-// ── Barre de progression journalière
+
+  // ── Barre de progression journalière
   const progress  = Math.min(1, consoTodayKwh / DAILY_KWH);
   const pctDay    = Math.round(progress * 100);
   const barW = 120, barH = 6;
@@ -248,16 +296,29 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh }) {
   Script.complete();
 }
 
-function addMetric(stack, icon, label, value, color) {
+function addMetric(stack, icon, label, value, color, trendIcon = "", trendColor = null) {
   const col = stack.addStack();
   col.layoutVertically();
   col.spacing = 2;
   const iconLabel = col.addText(`${icon} ${label}`);
-  iconLabel.font = Font.systemFont(9);
+  iconLabel.font = Font.systemFont(10);
   iconLabel.textColor = new Color("#ffffff80");
-  const valLabel = col.addText(value);
-  valLabel.font = Font.boldSystemFont(14);
-  valLabel.textColor = color;
+
+  if (trendIcon) {
+    const valRow = col.addStack();
+    valRow.layoutHorizontally();
+    valRow.centerAlignContent();
+    const valLabel = valRow.addText(value);
+    valLabel.font = Font.systemFont(10);
+    valLabel.textColor = color;
+    const trendLabel = valRow.addText(trendIcon);
+    trendLabel.font = Font.boldSystemFont(12);
+    trendLabel.textColor = trendColor ?? color;
+  } else {
+    const valLabel = col.addText(value);
+    valLabel.font = Font.boldSystemFont(14);
+    valLabel.textColor = color;
+  }
 }
 
 function solarColor(pct) {
@@ -268,7 +329,7 @@ function solarColor(pct) {
 }
 
 function formatW(watts) {
-  if (watts >= 1000) return `${(watts / 1000).toFixed(1)} kW`;
+  if (watts >= 1000) return `${(watts / 1000).toFixed(0)} kW`;
   return `${watts} W`;
 }
 
