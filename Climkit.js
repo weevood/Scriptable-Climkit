@@ -130,6 +130,7 @@ async function run() {
 
   log(`💰 Conso réseau HT : ${htKwh.toFixed(3)} kWh × ${TARIF_HT} CHF = ${htCost.toFixed(4)} CHF`);
   log(`💰 Conso réseau BT : ${btKwh.toFixed(3)} kWh × ${TARIF_BT} CHF = ${btCost.toFixed(4)} CHF`);
+  log(`💰 Coût total réseau : ${totalCost.toFixed(4)} CHF`);
 
   const ts = lastAppart?.timestamp
     ? new Date(lastAppart.timestamp).toLocaleTimeString("fr-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" })
@@ -248,7 +249,7 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   const tariffLabel = titleRow.addText(isLowTariff ? "🟢" : "⭕");
   tariffLabel.font = Font.boldSystemFont(10);
   tariffLabel.textColor = isLowTariff ? new Color("#4caf50") : new Color("#f44336");
-  w.addSpacer(8);
+  w.addSpacer(10);
 
   // ── Metrics row
   const metricsRow = w.addStack();
