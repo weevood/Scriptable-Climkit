@@ -48,7 +48,8 @@ async function run() {
 
   const now    = new Date();
   const tEnd   = toUTCIso(now);
-  const tStart = toUTCIso(new Date(now.getTime() - 2 * 3600 * 1000));
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const tStart   = toUTCIso(midnight);
   log(`🕐 Fenêtre de requête : ${tStart} → ${tEnd} (UTC)`);
 
   // Requêtes séquentielles avec retry (évite les timeouts en parallèle)
