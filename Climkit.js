@@ -76,7 +76,6 @@ async function run() {
     return;
   }
 
-  const lastAppart = appart[appart.length - 1];
   const lastAppart = appart[appart.length - 2];
   const lastSolar  = solar[solar.length - 2];
   const prevAppart = appart[appart.length - 3];
