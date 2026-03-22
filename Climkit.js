@@ -216,19 +216,10 @@ async function fetchWithRetry(token, meterId, tStart, tEnd, label) {
 
 async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend, totalCost }) {
   const w = new ListWidget();
-  w.refreshAfterDate = nextRefreshDate();
+  // w.refreshAfterDate = nextRefreshDate();
 
   const grad = new LinearGradient();
   grad.colors = [new Color("#1a1a2e"), new Color("#0f0f1a")];
-  // if (solarPct >= 80) {
-  //   grad.colors = [new Color("#398233"), new Color("#22aa22")];
-  // } else if (solarPct >= 60) {
-  //   grad.colors = [new Color("#1a3a1a"), new Color("#0f2d0f")];
-  // } else if (solarPct >= 40) {
-  //   grad.colors = [new Color("#2a3a10"), new Color("#1a2a08")];
-  // } else {
-  //   grad.colors = [new Color("#1a1a2e"), new Color("#0f0f1a")];
-  // }
   grad.locations  = [0.0, 1.0];
   grad.startPoint = new Point(0, 0);
   grad.endPoint   = new Point(0, 1);
@@ -296,7 +287,7 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   barLabel.font      = Font.systemFont(8);
   barLabel.textColor = new Color("#ffffff80");
   barLabel.centerAlignText();
-  w.addSpacer(2);
+  w.addSpacer(4);
   // ── Barre de progression journalière
   const barW = 120, barH = 4;
   const dc   = new DrawContext();
@@ -322,7 +313,7 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   const barImg     = barRow.addImage(dc.getImage());
   barImg.imageSize = new Size(barW, barH);
   barRow.addSpacer(null);
-  w.addSpacer(2);
+  w.addSpacer(4);
 
   // ── Label barre : coût réseau
   const costLabel = w.addText(`${costStr}`);
