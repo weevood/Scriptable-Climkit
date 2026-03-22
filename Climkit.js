@@ -16,7 +16,11 @@
 const SITE_ID       = "SITE_ID";
 const METER_APPART  = "METER_APPART";   // compteur appart
 const METER_SOLAR   = "METER_SOLAR";   // production PV
-const DAILY_KWH     = 4.0; // Estimated daily average
+
+// Tarifs en CHF/kWh (consommation réseau uniquement, hors solaire)
+const DAILY_KWH = 4.5;    // Estimated daily average
+const TARIF_HT  = 0.2921; // Haut tarif
+const TARIF_BT  = 0.1834; // Bas tarif
 
 // Retry
 const MAX_RETRIES     = 3;
@@ -120,12 +124,62 @@ async function run() {
   ) / 100;
   log(`🧮 consoTodayKwh=${consoTodayKwh} kWh`);
 
+  // ── Calcul du coût journalier (réseau uniquement, hors solaire)
+  const costResult = computeDailyCost(appart);
+  const { totalCost, htKwh, btKwh, htCost, btCost } = costResult;
+
+  log(`💰 Conso réseau HT : ${htKwh.toFixed(3)} kWh × ${TARIF_HT} CHF = ${htCost.toFixed(4)} CHF`);
+  log(`💰 Conso réseau BT : ${btKwh.toFixed(3)} kWh × ${TARIF_BT} CHF = ${btCost.toFixed(4)} CHF`);
+
   const ts = lastAppart?.timestamp
     ? new Date(lastAppart.timestamp).toLocaleTimeString("fr-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" })
     : "--:--";
 
   log(`✅ Rendu widget — ts=${ts}`);
-  await buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend });
+  await buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend, totalCost });
+}
+
+// ============================================================
+//  CALCUL DU COÛT JOURNALIER
+//  Pour chaque tranche 15min : on déduit la part solaire (self)
+//  puis on applique le tarif HT ou BT selon l'heure du timestamp.
+// ============================================================
+
+function computeDailyCost(appartData) {
+  let htKwh = 0;
+  let btKwh = 0;
+
+  for (const d of appartData) {
+    const netKwh = Math.max(0, (d.total ?? 0) - (d.self ?? 0)); // consommation réseau uniquement
+    if (netKwh === 0) continue;
+
+    const hour = getHourZurich(d.timestamp);
+    // BT : 23h–7h et 12h–17h
+    const isBT = hour >= 23 || hour < 7 || (hour >= 12 && hour < 17);
+
+    if (isBT) {
+      btKwh += netKwh;
+    } else {
+      htKwh += netKwh;
+    }
+  }
+
+  const htCost = htKwh * TARIF_HT;
+  const btCost = btKwh * TARIF_BT;
+  const totalCost = htCost + btCost;
+
+  return { totalCost, htKwh, btKwh, htCost, btCost };
+}
+
+// Retourne l'heure locale Zurich (0–23) depuis un timestamp Climkit
+// Format attendu : "2026-03-22 07:30:00+01:00" ou ISO
+function getHourZurich(timestamp) {
+  if (!timestamp) return 0;
+  const d = new Date(timestamp);
+  return parseInt(
+    d.toLocaleString("fr-CH", { timeZone: "Europe/Zurich", hour: "numeric", hour12: false }),
+    10
+  );
 }
 
 // ============================================================
@@ -159,7 +213,7 @@ async function fetchWithRetry(token, meterId, tStart, tEnd, label) {
 //  CONSTRUCTION DU WIDGET
 // ============================================================
 
-async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend }) {
+async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend, totalCost }) {
   const w = new ListWidget();
   w.refreshAfterDate = nextRefreshDate();
 
@@ -233,10 +287,17 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   pctLabel.centerAlignText();
   w.addSpacer(8);
 
-  // ── Barre de progression journalière
+  // ── Label barre : kWh
   const progress  = Math.min(1, consoTodayKwh / DAILY_KWH);
   const pctDay    = Math.round(progress * 100);
-  const barW = 120, barH = 6;
+  const costStr = totalCost < 0.01 ? "< 0.01 CHF" : `${totalCost.toFixed(2)} CHF`;
+  const barLabel = w.addText(`${consoTodayKwh.toFixed(2)}/${DAILY_KWH}kWh [${pctDay}%]`);
+  barLabel.font      = Font.systemFont(8);
+  barLabel.textColor = new Color("#ffffff80");
+  barLabel.centerAlignText();
+  w.addSpacer(2);
+  // ── Barre de progression journalière
+  const barW = 120, barH = 4;
   const dc   = new DrawContext();
   dc.size    = new Size(barW, barH);
   dc.opaque  = false;
@@ -260,13 +321,15 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   const barImg     = barRow.addImage(dc.getImage());
   barImg.imageSize = new Size(barW, barH);
   barRow.addSpacer(null);
-  w.addSpacer(3);
-  const barLabel = w.addText(`${consoTodayKwh.toFixed(2)}/${DAILY_KWH}kWh [${pctDay}%]`);
-  barLabel.font      = Font.systemFont(10);
-  barLabel.textColor = new Color("#ffffff80");
-  barLabel.centerAlignText();
+  w.addSpacer(2);
 
-  w.addSpacer(8);
+  // ── Label barre : coût réseau
+  const costLabel = w.addText(`${costStr}`);
+  costLabel.font      = Font.systemFont(8);
+  costLabel.textColor = new Color("#ffffff80");
+  costLabel.centerAlignText();
+
+  w.addSpacer(6);
 
   // ── Footer
   const footer = w.addText(`Dernière mesure : ${ts}`);
