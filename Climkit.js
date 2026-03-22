@@ -9,8 +9,8 @@
 //  1. Lance ce script une première fois : il te demandera ton
 //     username et password Climkit API, puis les stockera dans
 //     le Keychain iOS de façon sécurisée.
-//  2. Remplace YOUR_SITE_ID, METER_APPART, METER_SOLAR ci-dessous par ton vrai site_id
-//     (visible dans l'URL de app.climkit.io quand tu es sur ton site).
+//  2. Remplace SITE_ID, METER_APPART, METER_SOLAR et DAILY_KWH 
+//     ci-dessous.
 // ============================================================
 
 const SITE_ID       = "SITE_ID";
@@ -158,35 +158,25 @@ async function fetchWithRetry(token, meterId, tStart, tEnd, label) {
 // ============================================================
 //  UTILITAIRE TARIF
 // ============================================================
-
-function checkLowTariff() {
-  const now = new Date();
-  const hour = parseInt(
-    now.toLocaleString("fr-CH", { timeZone: "Europe/Zurich", hour: "numeric", hour12: false }),
-    10
-  );
-  // BT : 23h–7h et 12h–17h
-  return hour >= 23 || hour < 7 || (hour >= 12 && hour < 17);
-}
-
 // ============================================================
 //  CONSTRUCTION DU WIDGET
 // ============================================================
 
 async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend }) {
   const w = new ListWidget();
-  w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+  w.refreshAfterDate = nextRefreshDate();
 
   const grad = new LinearGradient();
-  if (solarPct >= 80) {
-    grad.colors = [new Color("#398233"), new Color("#22aa22")];
-  } else if (solarPct >= 60) {
-    grad.colors = [new Color("#1a3a1a"), new Color("#0f2d0f")];
-  } else if (solarPct >= 40) {
-    grad.colors = [new Color("#2a3a10"), new Color("#1a2a08")];
-  } else {
-    grad.colors = [new Color("#1a1a2e"), new Color("#0f0f1a")];
-  }
+  grad.colors = [new Color("#1a1a2e"), new Color("#0f0f1a")];
+  // if (solarPct >= 80) {
+  //   grad.colors = [new Color("#398233"), new Color("#22aa22")];
+  // } else if (solarPct >= 60) {
+  //   grad.colors = [new Color("#1a3a1a"), new Color("#0f2d0f")];
+  // } else if (solarPct >= 40) {
+  //   grad.colors = [new Color("#2a3a10"), new Color("#1a2a08")];
+  // } else {
+  //   grad.colors = [new Color("#1a1a2e"), new Color("#0f0f1a")];
+  // }
   grad.locations  = [0.0, 1.0];
   grad.startPoint = new Point(0, 0);
   grad.endPoint   = new Point(0, 1);
@@ -462,4 +452,25 @@ function sleep(ms) {
 function log(msg) {
   const time = new Date().toLocaleTimeString("fr-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit", second: "2-digit" });
   console.log(`[${time}] ${msg}`);
+}
+
+function checkLowTariff() {
+  const now = new Date();
+  const hour = parseInt(
+    now.toLocaleString("fr-CH", { timeZone: "Europe/Zurich", hour: "numeric", hour12: false }),
+    10
+  );
+  // BT : 23h–7h et 12h–17h
+  return hour >= 23 || hour < 7 || (hour >= 12 && hour < 17);
+}
+
+function nextRefreshDate() {
+  const now = new Date();
+  const minutes = now.getMinutes();
+  const targets = [1, 16, 31, 46];
+  // Trouver la prochaine cible
+  let nextMin = targets.find(t => t > minutes);
+  if (nextMin === undefined) nextMin = targets[0] + 60; // tour suivant
+  const diff = nextMin - minutes;
+  return new Date(now.getTime() + diff * 60 * 1000);
 }
