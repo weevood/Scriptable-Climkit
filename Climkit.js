@@ -127,11 +127,12 @@ async function run() {
 
   // ── Calcul du coût journalier (réseau uniquement, hors solaire)
   const costResult = computeDailyCost(appart);
-  const { totalCost, htKwh, btKwh, htCost, btCost } = costResult;
+  const { totalCost, htKwh, btKwh, solKwh, htCost, btCost, solCost } = costResult;
 
   log(`💰 Conso réseau HT : ${htKwh.toFixed(3)} kWh × ${TARIF_HT} CHF = ${htCost.toFixed(4)} CHF`);
   log(`💰 Conso réseau BT : ${btKwh.toFixed(3)} kWh × ${TARIF_BT} CHF = ${btCost.toFixed(4)} CHF`);
-  log(`💰 Coût total réseau : ${totalCost.toFixed(4)} CHF`);
+  log(`💰 Conso solaire   : ${solKwh.toFixed(3)} kWh × ${TARIF_SOL} CHF = ${solCost.toFixed(4)} CHF`);
+  log(`💰 Coût total      : ${totalCost.toFixed(4)} CHF`);
 
   const ts = lastAppart?.timestamp
     ? new Date(lastAppart.timestamp).toLocaleTimeString("fr-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" })
@@ -150,13 +151,17 @@ async function run() {
 function computeDailyCost(appartData) {
   let htKwh = 0;
   let btKwh = 0;
+  let solKwh = 0;
 
   for (const d of appartData) {
-    const netKwh = Math.max(0, (d.total ?? 0) - (d.self ?? 0)); // consommation réseau uniquement
+    const selfKwh = d.self ?? 0;                              // part solaire autoconsommée
+    const netKwh  = Math.max(0, (d.total ?? 0) - selfKwh);    // part réseau uniquement
+    
+    solKwh += selfKwh;
+
     if (netKwh === 0) continue;
 
     const hour = getHourZurich(d.timestamp);
-    // BT : 23h–7h et 12h–17h
     const isBT = hour >= 23 || hour < 7 || (hour >= 12 && hour < 17);
 
     if (isBT) {
@@ -166,11 +171,12 @@ function computeDailyCost(appartData) {
     }
   }
 
-  const htCost = htKwh * TARIF_HT;
-  const btCost = btKwh * TARIF_BT;
-  const totalCost = htCost + btCost;
+  const htCost  = htKwh  * TARIF_HT;
+  const btCost  = btKwh  * TARIF_BT;
+  const solCost = solKwh * TARIF_SOL;
+  const totalCost = htCost + btCost + solCost;
 
-  return { totalCost, htKwh, btKwh, htCost, btCost };
+  return { totalCost, htKwh, btKwh, solKwh, htCost, btCost, solCost };
 }
 
 // Retourne l'heure locale Zurich (0–23) depuis un timestamp Climkit
