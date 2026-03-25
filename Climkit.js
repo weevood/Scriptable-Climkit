@@ -19,8 +19,9 @@ const METER_SOLAR   = "METER_SOLAR";   // production PV
 
 // Tarifs en CHF/kWh (consommation réseau uniquement, hors solaire)
 const DAILY_KWH = 4.5;    // Estimated daily average
-const TARIF_HT  = 0.2921; // Haut tarif
-const TARIF_BT  = 0.1834; // Bas tarif
+const TARIF_HT  = 0.2921; // Électricité du réseau - Tarif standard
+const TARIF_BT  = 0.1834; // Électricité du réseau - Tarif réduit 
+const TARIF_SOL = 0.17;   // Energie solaire - Heures Creuses (HC)
 
 // Retry
 const MAX_RETRIES     = 3;
@@ -80,10 +81,10 @@ async function run() {
     return;
   }
 
-  const lastAppart = appart[appart.length - 2];
-  const lastSolar  = solar[solar.length - 2];
-  const prevAppart = appart[appart.length - 3];
-  const prevSolar  = solar[solar.length - 3];
+  const lastAppart = appart[appart.length - 1];
+  const lastSolar  = solar[solar.length - 1];
+  const prevAppart = appart[appart.length - 2];
+  const prevSolar  = solar[solar.length - 2];
 
   log(`📦 Dernière tranche appart : ${JSON.stringify(lastAppart)}`);
   log(`📦 Dernière tranche solaire : ${JSON.stringify(lastSolar)}`);
@@ -280,7 +281,7 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   w.addSpacer(8);
 
   // ── Label barre : kWh
-  const progress  = Math.min(1, consoTodayKwh / DAILY_KWH);
+  const progress  = (consoTodayKwh / DAILY_KWH);
   const pctDay    = Math.round(progress * 100);
   const costStr = totalCost < 0.01 ? "< 0.01 CHF" : `${totalCost.toFixed(2)} CHF`;
   const barLabel = w.addText(`${consoTodayKwh.toFixed(2)}/${DAILY_KWH}kWh [${pctDay}%]`);
@@ -370,7 +371,7 @@ function solarColor(pct) {
 }
 
 function formatW(watts) {
-  if (watts >= 1000) return `${(watts / 1000).toFixed(0)} kW`;
+  if (watts >= 1000) return `${(watts / 1000).toFixed(2)} kW`;
   return `${watts} W`;
 }
 
