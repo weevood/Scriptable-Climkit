@@ -134,6 +134,12 @@ async function run() {
   log(`💰 Conso solaire   : ${solKwh.toFixed(3)} kWh × ${TARIF_SOL} CHF = ${solCost.toFixed(4)} CHF`);
   log(`💰 Coût total      : ${totalCost.toFixed(4)} CHF`);
 
+  // Requête site_data/electricity (conso_total, prod_total)
+  log("📡 Requête site_data electricity…");
+  const data = await fetchSiteData(token, SITE_ID, tStart, tEnd);
+
+  if (!data || data.length === 0) {
+    log("❌ Données indisponibles");
     await showErrorWidget("Données indisponibles (site_data).");
     return;
   }
