@@ -54,7 +54,7 @@ async function run() {
 
   // Fenêtre 24h glissantes
   const now    = new Date();
-  const t24ago = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const t24ago = new Date(now.getTime() - 22 * 60 * 60 * 1000);
   const tStart = toUTCIso(t24ago);
   const tEnd   = toUTCIso(now);
 
