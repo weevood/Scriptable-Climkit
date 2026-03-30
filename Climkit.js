@@ -410,6 +410,8 @@ function solarColor(pct) {
 }
 
 function formatW(watts) {
+  if (watts >= 100000) return `${(watts / 1000).toFixed(0)} kW`;
+  if (watts >= 10000) return `${(watts / 1000).toFixed(1)} kW`;
   if (watts >= 1000) return `${(watts / 1000).toFixed(2)} kW`;
   return `${watts} W`;
 }
