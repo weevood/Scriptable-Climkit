@@ -295,7 +295,7 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   sepa.font = Font.systemFont(20);
   sepa.textColor = new Color("#ffffff30");
   pctStack.addSpacer(null);
-  addMetricSimple(pctStack, `${solarPct}%`, "de solaire", solarColor(solarPct));
+  addMetricSimple(pctStack, `${solarPct}%`, "énergie solaire", solarColor(solarPct));
   w.addSpacer(8);
 
   // ── Consommation moyenne
@@ -392,7 +392,7 @@ function addMetricSimple(row, value, text, color) {
   col.spacing = 1;
   const labelRow = col.addStack();
   const label = labelRow.addText(text);
-  label.font = Font.systemFont(8);
+  label.font = Font.systemFont(7);
   label.textColor = new Color("#ffffff80");
 }
 
