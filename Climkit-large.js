@@ -70,11 +70,12 @@ async function run() {
   let selfTotal  = 0;
   let toExtTotal = 0;
 
+  // Clamp à 0 dès l'ingestion : valeurs négatives = artefacts API
+  const clamp = v => Math.max(0, v ?? 0);
+
   for (const d of data) {
-    const prod    = d.prod_total ?? 0;
-    const self    = d.self       ?? 0;
-    const fromExt = d.from_ext   ?? 0;
-    const toExt   = d.to_ext     ?? 0;
+    const prod    = clamp(d.prod_total);
+    const self    = clamp(d.self);
 
     solarTotal += prod;
     selfTotal  += self;
@@ -213,9 +214,13 @@ async function renderChart(data) {
   const n = data.length;
   if (n < 2) return null;
 
-  const solarVals = data.map(d => d.prod_total ?? 0);
-  const selfVals  = data.map(d => d.self        ?? 0);
-  const extVals   = data.map(d => d.from_ext    ?? 0);
+  // Clamp à 0 : les valeurs négatives sont des artefacts API, elles
+  // faussent maxVal et décalent visuellement toutes les barres.
+  const clamp = v => Math.max(0, v ?? 0);
+
+  const solarVals = data.map(d => clamp(d.prod_total));
+  const selfVals  = data.map(d => clamp(d.self));
+  const extVals   = data.map(d => clamp(d.from_ext));
   const consoVals = data.map((_, i) => selfVals[i] + extVals[i]);
 
   const maxVal = Math.max(...solarVals, ...consoVals, 0.01);
@@ -286,7 +291,7 @@ async function renderChart(data) {
   }
 
   // Courbe prod_total : trait continu + points ronds jaunes
-  const SOLAR_DOT_THRESHOLD_KWH = 0.05;
+  const SOLAR_DOT_THRESHOLD_KWH = 0.04;
 
   const solarPts = solarVals.map((v, i) => {
     const cx = PAD_L + i * spacing + barW / 2;
