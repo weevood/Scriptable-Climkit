@@ -5,7 +5,7 @@
 //  Refresh : toutes les 15 minutes
 // ============================================================
 
-const SITE_ID = "SITE_ID";
+const SITE_ID = "641d74da9a92ba1f3b12b80b";
 
 // Palette
 const COLOR_BG_TOP    = "#0d1117";
@@ -134,7 +134,7 @@ async function buildWidget({ data, solarTotal, consoTotal, selfTotal, toExtTotal
   addSeparator(metRow);
   addStatBlock(metRow, "🏭 Injection", formatKWh(toExtTotal), new Color(COLOR_GRID));
   addSeparator(metRow);
-  addStatBlock(metRow, "♻️ Auto", `${solarPct}%`, new Color(COLOR_SELF));
+  addStatBlock(metRow, "♻️ Auto.", `${solarPct}%`, new Color(COLOR_SELF));
 
   // Spacer droit pour centrage global
   metRow.addSpacer(null);
@@ -251,7 +251,8 @@ async function renderChart(data) {
   dc.setLineWidth(0.5);
   dc.strokePath();
 
-  // Barres empilées : self (vert) + from_ext (rouge)
+  // Barres empilées : self (vert) + from_ext (rouge HP / orange HC)
+  // Heures creuses : 23h-7h et 12h-17h (heure Europe/Zurich)
   for (let i = 0; i < n; i++) {
     const x = PAD_L + i * spacing;
     const baseY = PAD_T + chartH;
@@ -266,33 +267,56 @@ async function renderChart(data) {
       dc.fillPath();
     }
     if (extH > 0.5) {
+      // Déterminer si la tranche est en heure creuse
+      const ts = data[i]?.timestamp ? new Date(data[i].timestamp) : null;
+      let isOffPeak = false;
+      if (ts) {
+        const h = parseInt(
+          ts.toLocaleString("fr-CH", { timeZone: "Europe/Zurich", hour: "numeric", hour12: false }), 10
+        );
+        // HC : 23h-7h (inclus) et 12h-17h (inclus)
+        isOffPeak = (h >= 23 || h < 7) || (h >= 12 && h < 17);
+      }
       const p = new Path();
       p.addRect(new Rect(x, baseY - selfH - extH, barW, extH));
       dc.addPath(p);
-      dc.setFillColor(new Color("#c0392b"));
+      dc.setFillColor(new Color(isOffPeak ? "#e67e22" : "#c0392b")); // orange HC, rouge HP
       dc.fillPath();
     }
   }
 
-  // Courbe prod_total
+  // Courbe prod_total : trait continu + points ronds jaunes
+  const SOLAR_DOT_THRESHOLD_KWH = 0.05;
+
   const solarPts = solarVals.map((v, i) => {
     const cx = PAD_L + i * spacing + barW / 2;
     const cy = PAD_T + chartH - (v / maxVal) * chartH;
-    return new Point(cx, cy);
+    return { pt: new Point(cx, cy), active: v >= SOLAR_DOT_THRESHOLD_KWH };
   });
 
+  // Trait : on trace segment par segment, uniquement entre points actifs consécutifs
   if (solarPts.length > 1) {
+    let inLine = false;
     const lp = new Path();
-    lp.move(solarPts[0]);
-    for (let i = 1; i < solarPts.length; i++) lp.addLine(solarPts[i]);
+    for (let i = 0; i < solarPts.length; i++) {
+      const { pt, active } = solarPts[i];
+      if (active) {
+        if (!inLine) { lp.move(pt); inLine = true; }
+        else          { lp.addLine(pt); }
+      } else {
+        inLine = false;
+      }
+    }
     dc.addPath(lp);
     dc.setStrokeColor(new Color("#f5c518cc"));
-    dc.setLineWidth(1.1);
+    dc.setLineWidth(1.2);
     dc.strokePath();
   }
 
+  // Points ronds jaunes uniquement sur les tranches actives
   const dotR = spacing > 5 ? 2.2 : 1.5;
-  for (const pt of solarPts) {
+  for (const { pt, active } of solarPts) {
+    if (!active) continue;
     const outer = new Path();
     outer.addEllipse(new Rect(pt.x - dotR - 0.8, pt.y - dotR - 0.8, (dotR + 0.8) * 2, (dotR + 0.8) * 2));
     dc.addPath(outer);
