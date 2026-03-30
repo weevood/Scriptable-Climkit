@@ -77,11 +77,13 @@ async function run() {
   const solarNow = last?.prod_total ?? 0;   // kWh sur 15 min
   const consoNow = (last?.from_ext ?? 0) + (last?.self ?? 0);
   const selfNow  = last?.self ?? 0;
+  const toExtNow  = last?.to_ext ?? 0;
 
   // Conversion en watts instantanés (×4 pour 15min→h, ×1000 pour kW→W)
   const solarW = Math.round(solarNow * 4 * 1000);
   const consoW = Math.round(consoNow * 4 * 1000);
   const selfW  = Math.round(selfNow  * 4 * 1000);
+  const toExtfW  = Math.round(toExtNow  * 4 * 1000);
 
   // Disponibilité solaire : production > seuil minimal (20W)
   const solarAvailable = solarW >= 20;
@@ -97,16 +99,17 @@ async function run() {
       })
     : "--:--";
 
-  log(`🧮 solarW=${solarW} consoW=${consoW} selfPct=${solarPct}% available=${solarAvailable}`);
+  log(`📦 Dernière tranche : ${JSON.stringify(last)}`);
+  log(`🧮 solarW=${solarW} consoW=${consoW} toExtfW=${toExtfW} selfPct=${solarPct}% available=${solarAvailable}`);
 
-  await buildWidget({ data, solarW, consoW, selfW, solarPct, solarAvailable, ts });
+  await buildWidget({ data, solarW, consoW, selfW, toExtfW, solarPct, solarAvailable, ts });
 }
 
 // ============================================================
 //  WIDGET MEDIUM
 // ============================================================
 
-async function buildWidget({ data, solarW, consoW, selfW, solarPct, solarAvailable, ts }) {
+async function buildWidget({ data, solarW, consoW, selfW, toExtfW, solarPct, solarAvailable, ts }) {
   const w = new ListWidget();
 
   // Fond dégradé sombre
@@ -116,49 +119,48 @@ async function buildWidget({ data, solarW, consoW, selfW, solarPct, solarAvailab
   grad.startPoint = new Point(0, 0);
   grad.endPoint   = new Point(1, 1);
   w.backgroundGradient = grad;
-  w.setPadding(14, 14, 10, 14);
+  w.setPadding(32, 12, 24, 12);
 
   // ── Ligne du haut : titre + badge solaire
-  const topRow = w.addStack();
-  topRow.layoutHorizontally();
-  topRow.centerAlignContent();
-
-  const titleTxt = topRow.addText("⚡ Énergie · 24h");
-  titleTxt.font = Font.boldSystemFont(11);
-  titleTxt.textColor = new Color(COLOR_TEXT);
-
-  topRow.addSpacer(null);
-
+  // const topRow = w.addStack();
+  // topRow.layoutHorizontally();
+  // topRow.centerAlignContent();
+  // const titleTxt = topRow.addText("⚡ Énergie · 24h");
+  // titleTxt.font = Font.boldSystemFont(11);
+  // titleTxt.textColor = new Color(COLOR_TEXT);
+  // topRow.addSpacer(null);
   // Badge "Solaire dispo / indispo"
-  const badgeColor = solarAvailable ? "#4caf5030" : "#f4433630";
-  const badgeTxtColor = solarAvailable ? "#4caf50" : "#f44336";
-  const badgeTxt = solarAvailable ? "☀️ Disponible" : "🌑 Indisponible";
-  const badge = topRow.addText(badgeTxt);
-  badge.font = Font.boldSystemFont(9);
-  badge.textColor = new Color(badgeTxtColor);
-
-  w.addSpacer(6);
+  // const badgeColor = solarAvailable ? "#4caf5030" : "#f4433630";
+  // const badgeTxtColor = solarAvailable ? "#4caf50" : "#f44336";
+  // const badgeTxt = solarAvailable ? "☀️ Disponible" : "🌑 Indisponible";
+  // const badge = topRow.addText(badgeTxt);
+  // badge.font = Font.boldSystemFont(9);
+  // badge.textColor = new Color(badgeTxtColor);
+  // w.addSpacer(6);
 
   // ── Ligne métriques : Solaire | Conso | % Auto
   const metRow = w.addStack();
   metRow.layoutHorizontally();
   metRow.centerAlignContent();
-
-  addStatBlock(metRow, "☀️ Solaire", formatW(solarW), new Color(COLOR_SOLAR));
+  addStatBlock(metRow, "☀️ Production", formatW(solarW), new Color(COLOR_SOLAR));
   metRow.addSpacer(null);
   const sep1 = metRow.addText("·");
-  sep1.font = Font.systemFont(16);
+  sep1.font = Font.systemFont(8);
   sep1.textColor = new Color("#ffffff25");
   metRow.addSpacer(null);
-  addStatBlock(metRow, "🏠 Conso", formatW(consoW), new Color(COLOR_CONSO));
+  addStatBlock(metRow, "🏢 Consomation", formatW(consoW), new Color(COLOR_CONSO));
   metRow.addSpacer(null);
   const sep2 = metRow.addText("·");
-  sep2.font = Font.systemFont(16);
+  sep2.font = Font.systemFont(8);
   sep2.textColor = new Color("#ffffff25");
   metRow.addSpacer(null);
-  addStatBlock(metRow, "♻️ Auto", `${solarPct}%`, new Color(COLOR_SELF));
-
-  w.addSpacer(8);
+  addStatBlock(metRow, "🏭 Injection", formatW(toExtfW), new Color(COLOR_SELF));
+  const sep3 = metRow.addText("·");
+  sep3.font = Font.systemFont(8);
+  sep3.textColor = new Color("#ffffff25");
+  metRow.addSpacer(null);
+  addStatBlock(metRow, "♻️ Autoconso", `${solarPct}%`, new Color(COLOR_SELF));
+  w.addSpacer();
 
   // ── Graphique 24h
   const chartImg = await renderChart(data);
@@ -167,15 +169,14 @@ async function buildWidget({ data, solarW, consoW, selfW, solarPct, solarAvailab
     chartStack.layoutHorizontally();
     chartStack.addSpacer(null);
     const img = chartStack.addImage(chartImg);
-    img.imageSize = new Size(310, 80);
+    img.imageSize = new Size(310, 110);
     chartStack.addSpacer(null);
   }
-
-  w.addSpacer(4);
+  w.addSpacer(2);
 
   // ── Footer
-  const footer = w.addText(`Mise à jour : ${ts} · climkit.io`);
-  footer.font = Font.systemFont(7);
+  const footer = w.addText(`Mise à jour : ${ts}`);
+  footer.font = Font.systemFont(6);
   footer.textColor = new Color("#ffffff40");
   footer.centerAlignText();
 
@@ -191,7 +192,7 @@ async function buildWidget({ data, solarW, consoW, selfW, solarPct, solarAvailab
 // ============================================================
 
 async function renderChart(data) {
-  const W = 310, H = 80;
+  const W = 310, H = 110;
   const PAD_L = 4, PAD_R = 4, PAD_T = 6, PAD_B = 14;
   const chartW = W - PAD_L - PAD_R;
   const chartH = H - PAD_T - PAD_B;
@@ -353,7 +354,7 @@ function addStatBlock(stack, label, value, color) {
   lbl.textColor = new Color(COLOR_MUTED);
 
   const val = col.addText(value);
-  val.font = Font.boldSystemFont(13);
+  val.font = Font.boldSystemFont(10);
   val.textColor = color;
 }
 
@@ -389,9 +390,9 @@ async function fetchSiteData(token, siteId, tStart, tEnd) {
     "Authorization": `Bearer ${token}`,
   };
   req.body = JSON.stringify({
-    t_s: tStart,
-    t_e: tEnd,
-    sampling_frequency: "15T",
+    t_s: tStart
+    // t_e: tEnd,
+    // sampling_frequency: "15T",
   });
 
   const data = await req.loadJSON();
@@ -498,6 +499,8 @@ function log(msg) {
 }
 
 function formatW(watts) {
-  if (watts >= 1000) return `${(watts / 1000).toFixed(1)} kW`;
-  return `${watts} W`;
+  if (watts >= 100000) return `${(watts / 1000).toFixed(0)} kWh`;
+  if (watts >= 10000) return `${(watts / 1000).toFixed(1)} kWh`;
+  if (watts >= 1000) return `${(watts / 1000).toFixed(2)} kWh`;
+  return `${watts} Wh`;
 }
