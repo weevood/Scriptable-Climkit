@@ -134,12 +134,27 @@ async function run() {
   log(`💰 Conso solaire   : ${solKwh.toFixed(3)} kWh × ${TARIF_SOL} CHF = ${solCost.toFixed(4)} CHF`);
   log(`💰 Coût total      : ${totalCost.toFixed(4)} CHF`);
 
+    await showErrorWidget("Données indisponibles (site_data).");
+    return;
+  }
+
+  log(`✅ ${data.length} tranches reçues`);
+
+  // Dernière tranche = état actuel
+  const last = data[data.length - 1];
+  const solarNow = (last?.prod_total * 1000) ?? 0; // watts
+  const consoNow = (last?.conso_total * 1000) ?? 0; // kw
+  const wattsDispo = Math.max(0, solarNow - consoNow);
+  log(`📦 Dernière tranche : ${JSON.stringify(last)}`);
+  log(`🏭 Production totale instantanée : ${formatW(solarNow)}`);
+  log(`♨️ Consomation totale instantanée : ${formatW(consoNow)}`);
+
   const ts = lastAppart?.timestamp
     ? new Date(lastAppart.timestamp).toLocaleTimeString("fr-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" })
     : "--:--";
 
   log(`✅ Rendu widget — ts=${ts}`);
-  await buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend, totalCost });
+  await buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend, totalCost, wattsDispo });
 }
 
 // ============================================================
@@ -221,7 +236,7 @@ async function fetchWithRetry(token, meterId, tStart, tEnd, label) {
 //  CONSTRUCTION DU WIDGET
 // ============================================================
 
-async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend, totalCost }) {
+async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarTrend, consoTrend, totalCost, wattsDispo }) {
   const w = new ListWidget();
   // w.refreshAfterDate = nextRefreshDate();
 
@@ -253,16 +268,14 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   const metricsRow = w.addStack();
   metricsRow.layoutHorizontally();
   metricsRow.centerAlignContent();
-
   // Solaire : ↑ vert (production monte = bien), ↓ rouge (production baisse = moins bien)
   const solarTrendIcon  = solarTrend === "up" ? "↑ " : solarTrend === "down" ? "↓ " : "";
   const solarTrendColor = solarTrend === "up" ? new Color("#4caf50") : new Color("#f44336");
-
   // Conso : ↑ rouge (consomme plus = moins bien), ↓ vert (consomme moins = bien)
   const consoTrendIcon  = consoTrend === "up" ? "↑ " : consoTrend === "down" ? "↓ " : "";
   const consoTrendColor = consoTrend === "up" ? new Color("#f44336") : new Color("#4caf50");
-
-  addMetric(metricsRow, "☀️", "Solaire", solarTrendIcon, solarTrendColor, formatW(solarW), new Color("#f5c518"));
+  const badgeTxt = solarW >= 20 ? "☀️" : "🌑";
+  addMetric(metricsRow, badgeTxt, "Solaire", solarTrendIcon, solarTrendColor, formatW(solarW), new Color("#f5c518"));
   metricsRow.addSpacer(null);
   const sep = metricsRow.addText("|");
   sep.font = Font.systemFont(20);
@@ -271,22 +284,21 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   addMetric(metricsRow, "🏠", "Conso", consoTrendIcon, consoTrendColor, formatW(consoW), new Color("#7ec8e3"));
   w.addSpacer(8);
 
-  // ── Pourcentage solaire
+  // ── Pourcentages solaire
   const pctStack = w.addStack();
   pctStack.layoutHorizontally();
-  pctStack.centerAlignContent();
+  pctStack.addSpacer();
+  consoColor = wattsDispo > 0 ? new Color("#4caf50") : new Color("#ffffff80");
+  addMetricSimple(pctStack, `${formatW(wattsDispo)}`, "à disposition", consoColor);
+  pctStack.addSpacer();
+  const sepa = pctStack.addText("");
+  sepa.font = Font.systemFont(20);
+  sepa.textColor = new Color("#ffffff30");
   pctStack.addSpacer(null);
-  const pctText = pctStack.addText(`${solarPct}%`);
-  pctText.font = Font.boldSystemFont(14);
-  pctText.textColor = solarColor(solarPct);
-  pctStack.addSpacer(null);
-  const pctLabel = w.addText("d'énergie solaire");
-  pctLabel.font = Font.systemFont(10);
-  pctLabel.textColor = new Color("#ffffff80");
-  pctLabel.centerAlignText();
+  addMetricSimple(pctStack, `${solarPct}%`, "de solaire", solarColor(solarPct));
   w.addSpacer(8);
 
-  // ── Label barre : kWh
+  // ── Consommation moyenne
   const progress  = (consoTodayKwh / DAILY_KWH);
   const pctDay    = Math.round(progress * 100);
   const costStr = totalCost < 0.01 ? "< 0.01 CHF" : `${totalCost.toFixed(2)} CHF`;
@@ -295,7 +307,7 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   barLabel.textColor = new Color("#ffffff80");
   barLabel.centerAlignText();
   w.addSpacer(4);
-  // ── Barre de progression journalière
+  // Barre de progression journalière
   const barW = 120, barH = 4;
   const dc   = new DrawContext();
   dc.size    = new Size(barW, barH);
@@ -321,13 +333,11 @@ async function buildWidget({ consoW, solarW, solarPct, ts, consoTodayKwh, solarT
   barImg.imageSize = new Size(barW, barH);
   barRow.addSpacer(null);
   w.addSpacer(4);
-
-  // ── Label barre : coût réseau
+  // Coût réseau
   const costLabel = w.addText(`${costStr}`);
   costLabel.font      = Font.systemFont(8);
   costLabel.textColor = new Color("#ffffff80");
   costLabel.centerAlignText();
-
   w.addSpacer(6);
 
   // ── Footer
@@ -367,6 +377,23 @@ function addMetric(stack, icon, label, value, color, trendIcon = "", trendColor 
     valLabel.font = Font.boldSystemFont(14);
     valLabel.textColor = color;
   }
+}
+
+function addMetricSimple(row, value, text, color) {
+  const col = row.addStack();
+  col.layoutVertically();
+  col.centerAlignContent();
+  const valRow = col.addStack();
+  valRow.addSpacer();
+  const valLabel = valRow.addText(value);
+  valLabel.font = Font.boldSystemFont(10);
+  valLabel.textColor = color;
+  valRow.addSpacer();
+  col.spacing = 1;
+  const labelRow = col.addStack();
+  const label = labelRow.addText(text);
+  label.font = Font.systemFont(8);
+  label.textColor = new Color("#ffffff80");
 }
 
 function solarColor(pct) {
@@ -493,6 +520,29 @@ async function fetchMeterData(token, meterId, tStart, tEnd) {
     log("  → ⚠️ Tableau vide — pas de données sur cette fenêtre");
     return null;
   }
+  return data;
+}
+
+async function fetchSiteData(token, siteId, tStart, tEnd) {
+  const url = `${API_BASE}/site_data/${siteId}/electricity`;
+  log(`  → POST ${url}`);
+
+  const req = new Request(url);
+  req.method = "POST";
+  req.headers = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`,
+  };
+  req.body = JSON.stringify({
+    t_s: tStart
+    //t_e: tEnd,
+    //sampling_frequency: "15T",
+  });
+
+  const data = await req.loadJSON();
+  log(`  → ${Array.isArray(data) ? data.length + " entrées" : "réponse non-tableau : " + typeof data}`);
+
+  if (!Array.isArray(data) || data.length === 0) return null;
   return data;
 }
 
