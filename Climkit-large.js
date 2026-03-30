@@ -5,7 +5,7 @@
 //  Refresh : toutes les 15 minutes
 // ============================================================
 
-const SITE_ID = "641d74da9a92ba1f3b12b80b";
+const SITE_ID = "SITE_ID";
 
 // Palette
 const COLOR_BG_TOP    = "#0d1117";
@@ -76,6 +76,8 @@ async function run() {
   for (const d of data) {
     const prod    = clamp(d.prod_total);
     const self    = clamp(d.self);
+    const fromExt = clamp(d.from_ext);
+    const toExt   = clamp(d.to_ext);
 
     solarTotal += prod;
     selfTotal  += self;
