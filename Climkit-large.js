@@ -137,7 +137,7 @@ async function buildWidget({ data, solarTotal, consoTotal, selfTotal, toExtTotal
   addSeparator(metRow);
   addStatBlock(metRow, "🏭 Injection", formatKWh(toExtTotal), new Color(COLOR_GRID));
   addSeparator(metRow);
-  addStatBlock(metRow, "♻️ Auto.", `${solarPct}%`, new Color(COLOR_SELF));
+  addStatBlock(metRow, "♻️ Auto.", `${solarPct}%`, solarColor(solarPct));
 
   // Spacer droit pour centrage global
   metRow.addSpacer(null);
@@ -492,16 +492,17 @@ function log(msg) {
   console.log(`[${time}] ${msg}`);
 }
 
-/**
- * Formate une énergie en kWh avec l'unité adaptée.
- * Les valeurs API sont en kWh par tranche 15 min.
- * Sur 24h (≤ 96 tranches), les totaux restent en kWh.
- */
 function formatKWh(kwh) {
   if (kwh >= 1000) return `${(kwh).toFixed(0)} kWh`;
   if (kwh >= 100)  return `${(kwh).toFixed(1)} kWh`;
   if (kwh >= 10)   return `${(kwh).toFixed(2)} kWh`;
   if (kwh >= 1)    return `${(kwh).toFixed(3)} kWh`;
-  // Sous 1 kWh → affichage en Wh pour plus de lisibilité
   return `${Math.round(kwh * 1000)} Wh`;
+}
+
+function solarColor(pct) {
+  if (pct >= 80) return new Color("#4caf50");
+  if (pct >= 60) return new Color("#f5c518");
+  if (pct >= 40) return new Color("#ff9800");
+  return new Color("#f44336");
 }
