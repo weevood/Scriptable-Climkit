@@ -15,7 +15,7 @@
 
 const SITE_ID       = "SITE_ID";
 const METER_APPART  = "METER_APPART";   // compteur appart
-const METER_SOLAR   = "METER_SOLAR";   // production PV
+const METER_SOLAR   = "METER_SOLAR";    // production PV
 
 // Tarifs en CHF/kWh (consommation réseau uniquement, hors solaire)
 const DAILY_KWH = 4.5;    // Estimated daily average
