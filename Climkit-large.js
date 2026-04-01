@@ -145,24 +145,25 @@ async function buildWidget({ data, solarTotal, consoTotal, selfTotal, toExtTotal
   w.addSpacer(6);
 
   // ── Graphique 24h
-  const chartImg = await renderChart(data);
+  const CHART_HEIGHT = 115;
+  const chartImg = await renderChart(data, CHART_HEIGHT);
   if (chartImg) {
     const chartStack = w.addStack();
     chartStack.layoutHorizontally();
     chartStack.centerAlignContent();
     chartStack.addSpacer(null);
     const img = chartStack.addImage(chartImg);
-    img.imageSize = new Size(310, 100);
+    img.imageSize = new Size(310, CHART_HEIGHT);
     chartStack.addSpacer(null);
   }
 
-  w.addSpacer(2);
+  // w.addSpacer(2);
 
-  // ── Footer
-  const footer = w.addText(`Mise à jour : ${ts}`);
-  footer.font = Font.systemFont(6);
-  footer.textColor = new Color("#ffffff40");
-  footer.centerAlignText();
+  // // ── Footer
+  // const footer = w.addText(`Mise à jour : ${ts}`);
+  // footer.font = Font.systemFont(6);
+  // footer.textColor = new Color("#ffffff40");
+  // footer.centerAlignText();
 
   if (config.runsInWidget) Script.setWidget(w);
   else w.presentMedium();
@@ -202,8 +203,8 @@ function addSeparator(stack) {
 //  RENDU DU GRAPHIQUE (DrawContext)
 // ============================================================
 
-async function renderChart(data) {
-  const W = 310, H = 100;
+async function renderChart(data, height) {
+  const W = 310, H = height;
   const PAD_L = 4, PAD_R = 4, PAD_T = 6, PAD_B = 14;
   const chartW = W - PAD_L - PAD_R;
   const chartH = H - PAD_T - PAD_B;
@@ -234,7 +235,7 @@ async function renderChart(data) {
   const bgPath = new Path();
   bgPath.addRect(new Rect(PAD_L, PAD_T, chartW, chartH));
   dc.addPath(bgPath);
-  dc.setFillColor(new Color("#00000030"));
+  dc.setFillColor(Color.clear());
   dc.fillPath();
 
   // Grille
@@ -316,7 +317,7 @@ async function renderChart(data) {
     }
     dc.addPath(lp);
     dc.setStrokeColor(new Color("#f5c518cc"));
-    dc.setLineWidth(1.2);
+    dc.setLineWidth(2);
     dc.strokePath();
   }
 
@@ -327,13 +328,13 @@ async function renderChart(data) {
     const outer = new Path();
     outer.addEllipse(new Rect(pt.x - dotR - 0.8, pt.y - dotR - 0.8, (dotR + 0.8) * 2, (dotR + 0.8) * 2));
     dc.addPath(outer);
-    dc.setFillColor(new Color("#1a1a1a"));
+    dc.setFillColor(new Color(COLOR_SOLAR));
     dc.fillPath();
 
     const inner = new Path();
-    inner.addEllipse(new Rect(pt.x - dotR, pt.y - dotR, dotR * 2, dotR * 2));
+    inner.addEllipse(new Rect(pt.x - dotR, pt.y - dotR, dotR, dotR));
     dc.addPath(inner);
-    dc.setFillColor(new Color("#f5c518"));
+    dc.setFillColor(new Color(COLOR_SOLAR));
     dc.fillPath();
   }
 
