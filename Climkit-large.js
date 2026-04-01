@@ -118,7 +118,7 @@ async function buildWidget({ data, solarTotal, consoTotal, selfTotal, toExtTotal
   grad.startPoint = new Point(0, 0);
   grad.endPoint   = new Point(1, 1);
   w.backgroundGradient = grad;
-  w.setPadding(12, 12, 12, 12);
+  w.setPadding(12, 12, 2, 12);
 
   // ── Ligne métriques centrée : 4 blocs dans un stack horizontal
   //    Chaque bloc est centré verticalement ; on utilise addSpacer(null)
@@ -205,7 +205,7 @@ function addSeparator(stack) {
 
 async function renderChart(data, height) {
   const W = 310, H = height;
-  const PAD_L = 4, PAD_R = 4, PAD_T = 6, PAD_B = 14;
+  const PAD_L = 4, PAD_R = 4, PAD_T = 4, PAD_B = 12;
   const chartW = W - PAD_L - PAD_R;
   const chartH = H - PAD_T - PAD_B;
 
@@ -238,7 +238,7 @@ async function renderChart(data, height) {
   dc.setFillColor(Color.clear());
   dc.fillPath();
 
-  // Grille
+  // Grille + labels Y (max et mi-valeur)
   for (let i = 1; i <= 2; i++) {
     const gy = PAD_T + chartH * (1 - i / 2);
     const gp = new Path();
@@ -248,6 +248,16 @@ async function renderChart(data, height) {
     dc.setStrokeColor(new Color("#ffffff15"));
     dc.setLineWidth(0.5);
     dc.strokePath();
+
+    // Label Y : valeur correspondant à cette ligne de grille
+    const yVal = maxVal * (i / 2);
+    const yLabel = yVal >= 1
+      ? `${yVal.toFixed(1)}kW`
+      : `${Math.round(yVal * 1000)}W`;
+
+    dc.setFont(Font.systemFont(6));
+    dc.setTextColor(new Color("#ffffff50"));
+    dc.drawTextInRect(yLabel, new Rect(0, gy - 4, PAD_L + 28, 9));
   }
 
   // Axe X
