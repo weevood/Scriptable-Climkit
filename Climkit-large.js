@@ -118,7 +118,7 @@ async function buildWidget({ data, solarTotal, consoTotal, selfTotal, toExtTotal
   grad.startPoint = new Point(0, 0);
   grad.endPoint   = new Point(1, 1);
   w.backgroundGradient = grad;
-  w.setPadding(12, 12, 6, 12);
+  w.setPadding(12, 12, 12, 12);
 
   // ── Ligne métriques centrée : 4 blocs dans un stack horizontal
   //    Chaque bloc est centré verticalement ; on utilise addSpacer(null)
